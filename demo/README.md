@@ -307,16 +307,3 @@ Unit test service yang tersedia mencakup:
 - Perhitungan total harga berdasarkan tarif server.
 
 Jalankan test di komputer sendiri dan pastikan hasilnya `BUILD SUCCESS` sebelum mengirimkan repository. Unit test yang tersedia bukan pengganti integration test penuh terhadap MySQL.
-
-## 14. Batasan dan pengembangan lanjutan
-
-Proyek ini berfokus pada persyaratan take-home assessment. Autentikasi/otorisasi, pembayaran, audit trail, notifikasi, dan kebijakan refund belum diimplementasikan. Idempotency key untuk request rental duplikat juga belum tersedia; row locking dan pengecekan periode membantu mencegah booking bentrok, tetapi tidak sama dengan idempotensi request.
-
-## 15. Checklist sebelum pengumpulan
-
-- [ ] Pastikan JDK 21 dan koneksi MySQL tersedia.
-- [ ] Jalankan `mvn clean test` dan pastikan `BUILD SUCCESS`.
-- [ ] Jalankan aplikasi dan uji tiga endpoint utama (`POST` mobil, `GET` mobil, `POST` rental).
-- [ ] Periksa validasi, bentrok periode, kalkulasi harga, dan rollback ketika proses transaksi gagal.
-- [ ] Pastikan README dan file Postman ikut disertakan dalam repository.
-- [ ] Unggah source code lengkap dan README ke repository GitHub/GitLab **publik**, sesuai instruksi pengumpulan assessment.
