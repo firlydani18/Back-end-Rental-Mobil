@@ -1,0 +1,759 @@
+{
+  "info": {
+    "_postman_id": "a23a2b76-0f2c-44cb-a2e0-3b1b5df5a842",
+    "name": "Rental Mobil API - Automated Tests",
+    "description": "Postman automated test collection for the Spring Boot Rental Mobil API. Run the full collection in order with the Rental Mobil - Local environment. Tests create a new test car each run and use future dates generated automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "carId",
+      "value": ""
+    },
+    {
+      "key": "rentalId",
+      "value": ""
+    },
+    {
+      "key": "testPlate",
+      "value": ""
+    },
+    {
+      "key": "testStartDate",
+      "value": ""
+    },
+    {
+      "key": "testEndDate",
+      "value": ""
+    },
+    {
+      "key": "testDailyRate",
+      "value": "350000"
+    },
+    {
+      "key": "testCustomerEmail",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Create Car",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars",
+        "description": "Creates a unique test car and generates test dates for later requests.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza QA\",\n  \"plateNumber\": \"{{testPlate}}\",\n  \"dailyRate\": 350000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Generate unique data for each full Collection Runner execution.",
+              "const now = new Date();",
+              "const start = new Date(now.getTime());",
+              "start.setUTCDate(start.getUTCDate() + 14);",
+              "const end = new Date(start.getTime());",
+              "end.setUTCDate(end.getUTCDate() + 2); // inclusive 3 calendar days",
+              "const fmt = d => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;",
+              "pm.collectionVariables.set('testPlate', 'PMT' + Date.now());",
+              "pm.collectionVariables.set('testStartDate', fmt(start));",
+              "pm.collectionVariables.set('testEndDate', fmt(end));",
+              "pm.collectionVariables.set('testDailyRate', '350000');",
+              "pm.collectionVariables.set('testCustomerEmail', 'qa-' + Date.now() + '@example.com');",
+              "pm.collectionVariables.unset('carId');",
+              "pm.collectionVariables.unset('rentalId');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Create car returns 201 Created\", () => pm.expect(pm.response.code).to.eql(201));",
+              "pm.test(\"Envelope is successful\", () => pm.expect(json.success).to.eql(true));",
+              "pm.test(\"Car has an ID and AVAILABLE status\", () => { pm.expect(json.data.id).to.exist; pm.expect(json.data.status).to.eql('AVAILABLE'); });",
+              "pm.test(\"Daily rate matches request\", () => pm.expect(Number(json.data.dailyRate)).to.eql(350000));",
+              "pm.collectionVariables.set('carId', String(json.data.id));",
+              "pm.collectionVariables.set('carName', json.data.brand + ' ' + json.data.model);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Duplicate Plate Must Fail",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Duplicate Plate\",\n  \"plateNumber\": \"{{testPlate}}\",\n  \"dailyRate\": 250000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Duplicate plate returns 409 Conflict\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Error response is structured\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.status).to.eql(409); pm.expect(json.message).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Invalid Car Input Must Fail",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brand\": \"\",\n  \"model\": \"Bad Rate\",\n  \"plateNumber\": \"BAD-RATE-QA\",\n  \"dailyRate\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Invalid car input returns 400 Bad Request\", () => pm.expect(pm.response.code).to.eql(400));",
+              "pm.test(\"Validation errors are included\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.details).to.be.an('object'); pm.expect(Object.keys(json.details).length).to.be.greaterThan(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - List Cars With Pagination",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars?page=0&size=100&sort=id,desc"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"List cars returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Paged list has content array\", () => { pm.expect(json.success).to.eql(true); pm.expect(json.data.content).to.be.an('array'); pm.expect(json.data).to.have.property('totalElements'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Get Created Car",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars/{{carId}}"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Get car returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Returned ID matches created car\", () => pm.expect(String(json.data.id)).to.eql(pm.collectionVariables.get('carId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Availability Before Booking Is True",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars?startDate={{testStartDate}}&endDate={{testEndDate}}&page=0&size=100&sort=id,desc"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Availability query returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "const id = String(pm.collectionVariables.get('carId'));",
+              "const car = json.data.content.find(c => String(c.id) === id);",
+              "pm.test(\"Created car appears in availability response\", () => pm.expect(car, 'car id ' + id).to.exist);",
+              "pm.test(\"Car is available before booking\", () => pm.expect(car.availableForPeriod).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Create Rental (3 Days)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/rentals",
+        "description": "Uses generated dates 14–16 days in the future. The end date is inclusive.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"customerName\": \"QA Customer\",\n  \"customerEmail\": \"{{testCustomerEmail}}\",\n  \"startDate\": \"{{testStartDate}}\",\n  \"endDate\": \"{{testEndDate}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Create rental returns 201 Created\", () => pm.expect(pm.response.code).to.eql(201));",
+              "pm.test(\"Rental starts in BOOKED status\", () => pm.expect(json.data.status).to.eql('BOOKED'));",
+              "pm.test(\"Inclusive rental duration is 3 days\", () => pm.expect(Number(json.data.rentalDays)).to.eql(3));",
+              "pm.test(\"Server calculates total price\", () => pm.expect(Number(json.data.totalPrice)).to.eql(1050000));",
+              "pm.test(\"Rental references the created car\", () => pm.expect(String(json.data.carId)).to.eql(pm.collectionVariables.get('carId')));",
+              "pm.collectionVariables.set('rentalId', String(json.data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Availability After Booking Is False",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars?startDate={{testStartDate}}&endDate={{testEndDate}}&page=0&size=100&sort=id,desc"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Availability query returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "const id = String(pm.collectionVariables.get('carId'));",
+              "const car = json.data.content.find(c => String(c.id) === id);",
+              "pm.test(\"Car appears in availability response\", () => pm.expect(car).to.exist);",
+              "pm.test(\"Booked car is unavailable for overlapping period\", () => pm.expect(car.availableForPeriod).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Overlapping Rental Must Fail",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/rentals",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"customerName\": \"Duplicate Booking QA\",\n  \"customerEmail\": \"duplicate@example.com\",\n  \"startDate\": \"{{testStartDate}}\",\n  \"endDate\": \"{{testEndDate}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Overlapping booking returns 409 Conflict\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Error response indicates failure\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.status).to.eql(409); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Invalid Rental Date Range Must Fail",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/rentals",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"customerName\": \"Invalid Dates QA\",\n  \"customerEmail\": \"invalid-dates@example.com\",\n  \"startDate\": \"{{testEndDate}}\",\n  \"endDate\": \"{{testStartDate}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Reversed date range returns 409 Conflict\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Error response has a message\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.message).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Cannot Set Maintenance While Rental Is Booked",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars/{{carId}}/status",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"MAINTENANCE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Changing status during an active/future BOOKED rental returns 409\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Error describes business rule\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.message).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Cannot Complete Rental Before End Date",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/rentals/{{rentalId}}/complete"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Completing before end date returns 409 Conflict\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Response explains invalid transition\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.message).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Cancel Rental",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/rentals/{{rentalId}}/cancel"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Cancel rental returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Rental status changes to CANCELLED\", () => pm.expect(json.data.status).to.eql('CANCELLED'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Cannot Cancel Same Rental Twice",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/rentals/{{rentalId}}/cancel"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Second cancellation returns 409 Conflict\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Error response is structured\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.status).to.eql(409); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Availability Returns After Cancellation",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars?startDate={{testStartDate}}&endDate={{testEndDate}}&page=0&size=100&sort=id,desc"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Availability query returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "const id = String(pm.collectionVariables.get('carId'));",
+              "const car = json.data.content.find(c => String(c.id) === id);",
+              "pm.test(\"Cancelled booking no longer blocks the period\", () => { pm.expect(car).to.exist; pm.expect(car.availableForPeriod).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 - Update Car Details",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars/{{carId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"brand\": \"Toyota\",\n  \"model\": \"Avanza QA Updated\",\n  \"plateNumber\": \"{{testPlate}}\",\n  \"dailyRate\": 400000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Update car returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Updated model is returned\", () => pm.expect(json.data.model).to.eql('Avanza QA Updated'));",
+              "pm.test(\"Updated daily rate is returned\", () => pm.expect(Number(json.data.dailyRate)).to.eql(400000));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 - Set Car To Maintenance After Cancellation",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars/{{carId}}/status",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"MAINTENANCE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Status update returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Car status is MAINTENANCE\", () => pm.expect(json.data.status).to.eql('MAINTENANCE'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 - Cannot Rent Car Under Maintenance",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/rentals",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"customerName\": \"Maintenance Test\",\n  \"customerEmail\": \"maintenance@example.com\",\n  \"startDate\": \"{{testStartDate}}\",\n  \"endDate\": \"{{testEndDate}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Rental for maintenance car returns 409\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Business error is returned\", () => pm.expect(json.success).to.eql(false));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 - Restore Car To Available",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cars/{{carId}}/status",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"AVAILABLE\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Restore status returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Car status is AVAILABLE\", () => pm.expect(json.data.status).to.eql('AVAILABLE'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 - List Rentals With Pagination",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/rentals?page=0&size=10&sort=id,desc"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"List rentals returns 200\", () => pm.expect(pm.response.code).to.eql(200));",
+              "pm.test(\"Rental page contains content array\", () => { pm.expect(json.success).to.eql(true); pm.expect(json.data.content).to.be.an('array'); pm.expect(json.data).to.have.property('totalElements'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 - Nonexistent Car Returns 404",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars/987654321"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Missing car returns 404 Not Found\", () => pm.expect(pm.response.code).to.eql(404));",
+              "pm.test(\"404 response is structured\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.status).to.eql(404); pm.expect(json.message).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 - Availability Requires Both Dates",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cars?startDate={{testStartDate}}"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Providing only one period date returns 409\", () => pm.expect(pm.response.code).to.eql(409));",
+              "pm.test(\"Error response is structured\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.status).to.eql(409); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 - Invalid Email Must Fail Validation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/rentals",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"customerName\": \"Bad Email QA\",\n  \"customerEmail\": \"not-an-email\",\n  \"startDate\": \"{{testStartDate}}\",\n  \"endDate\": \"{{testEndDate}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test(\"Invalid email returns 400 Bad Request\", () => pm.expect(pm.response.code).to.eql(400));",
+              "pm.test(\"Validation details mention the invalid field\", () => { pm.expect(json.success).to.eql(false); pm.expect(json.details).to.have.property('customerEmail'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
